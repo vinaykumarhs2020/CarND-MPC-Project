@@ -8,9 +8,13 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 #include "json.hpp"
+#include <time.h>
 
 // for convenience
 using json = nlohmann::json;
+
+using namespace std;
+using namespace Eigen;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -65,13 +69,31 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+void get_rotation_matrix(double psi, double px, double py, Eigen::MatrixXd &rotation_matrx){
+  // Initialize rotation matrix with Identity matrix
+  // rotation_matrx(0,0) = rotation_matrx(1,1) = 10;
+  rotation_matrx(0,0) = rotation_matrx(1,1) = cos(psi);
+  rotation_matrx(0,1) = -1 * sin(psi);
+  rotation_matrx(1,0) = sin(psi);
+  // rotation_matrx(0,2) = -px;
+  // rotation_matrx(1,2) = -1.0 * py;
+}
+
 int main() {
   uWS::Hub h;
 
   // MPC is initialized here!
   MPC mpc;
 
-  h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  // Temporary values to mitigate latency
+  double _acc = 0.0;
+  double _ste = 0.0;
+  auto start_time = std::chrono::system_clock::now();
+
+  Eigen::MatrixXd rotation_matrx = Eigen::MatrixXd::Zero(2,3);
+  Eigen::MatrixXd global_traj;
+
+  h.onMessage([&](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -89,17 +111,41 @@ int main() {
           vector<double> ptsy = j[1]["ptsy"];
           double px = j[1]["x"];
           double py = j[1]["y"];
-          double psi = j[1]["psi"];
-          double v = j[1]["speed"];
+          double psi = -1.0 * double(j[1]["psi"]); // Get data in right hand coord
+          double v = 0.44704 * double(j[1]["speed"]); // Convert mph to m/s
+          // Collect additional parameters from telemetry data:
+          double _t_steer = j[1]["steering_angle"];
+          double _t_throt = j[1]["throttle"];
 
+          get_rotation_matrix(psi, px, py, rotation_matrx);
+          cout << rotation_matrx << endl;
+
+          // Create a matrix of homogeneous coordinates
+          assert(ptsx.size() == ptsy.size());
+          global_traj.resize(3,ptsx.size());
+          global_traj.row(0) = Eigen::Map<Eigen::VectorXd>(ptsx.data(), ptsx.size());
+          global_traj.row(1) = Eigen::Map<Eigen::VectorXd>(ptsy.data(), ptsy.size());
+          global_traj.row(2).setConstant(1.0);
+
+          cout << global_traj << endl;
+
+          MatrixXd car_coord = rotation_matrx * global_traj;
+
+          cout << car_coord << endl;
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+
+          auto end_time = std::chrono::system_clock::now();
+          std::chrono::duration<double> latency =  end_time - start_time;
+
+          std::cout << "latency: " << latency.count() << std::endl;
+
+          double steer_value = 0.1;
+          double throttle_value = 0.1;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -107,7 +153,7 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
-          //Display the MPC predicted trajectory 
+          //Display the MPC predicted trajectory
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
@@ -118,8 +164,8 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<double> next_x_vals(car_coord.row(0).data(), car_coord.row(0).data() + car_coord.row(0).size());
+          vector<double> next_y_vals(car_coord.row(1).data(), car_coord.row(1).data() + car_coord.row(1).size());
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
@@ -130,6 +176,8 @@ int main() {
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
+
+          start_time = std::chrono::system_clock::now();  // Record time
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
