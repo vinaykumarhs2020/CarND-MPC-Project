@@ -48,12 +48,15 @@ class FG_eval {
     fg[V_START + 1] = vars[V_START];
     fg[CTE_START + 1] = vars[CTE_START];
     fg[EPSI_START + 1] = vars[EPSI_START];
+    std::cout << "CTE: " << vars[CTE_START] << std::endl;
+    std::cout << "EPSI: " << vars[EPSI_START] << std::endl;
 
     // Add costs
     for(int i=0; i < MPC_N; i++){
       fg[0] += CTE_COST_FACTOR * CppAD::pow(vars[CTE_START + i], 2);
+      // fg[0] += CppAD::exp(1.5 * CppAD::pow(vars[CTE_START + i], 2));
       fg[0] += EPSI_COST_FACTOR * CppAD::pow(vars[EPSI_START + i], 2);
-      fg[0] += CppAD::pow(vars[V_START + i] - MPC_REF_V, 2);
+      fg[0] += VEL_COST_FACTOR * CppAD::pow(vars[V_START + i] - MPC_REF_V, 2);
     }
 
     for(int j=0;j<MPC_N-1; ++j){
@@ -63,8 +66,9 @@ class FG_eval {
     }
 
     for (int t = 0; t < MPC_N - 2; t++) {
-      fg[0] += 1000*CppAD::pow(vars[DELTA_START + t + 1] - vars[DELTA_START + t], 2);
-      fg[0] += CppAD::pow(vars[A_START + t + 1] - vars[A_START + t], 2);
+      fg[0] += DELTA_CHANGE_THRESHOLD * CppAD::pow(vars[DELTA_START + t + 1] - vars[DELTA_START + t], 2);
+      fg[0] += A_CHANGE_THRESHOLD * CppAD::pow(vars[A_START + t + 1] - vars[A_START + t], 2);
+      fg[0] += PSI_CHANGE_THRESHOLD * CppAD::pow(vars[PSI_START + t + 1] - vars[PSI_START + t], 2);
     }
 
     // Set values for fg[1:]
