@@ -141,11 +141,15 @@ int main() {
           std::chrono::duration<double> latency =  end_time - start_time;
           std::cout << "Delay: " << latency.count() << std::endl;
           // Fill the state vector:
+          psi = 0; // _psi=0 after transformation
+          double epsi = -atan(coeffs(1));
           double _x = v * cos(psi) * latency.count();
           double _y = v * sin(psi) * latency.count();
           double _psi = -v * _t_steer * latency.count() / mpc.Lf;
-          double _cte = polyeval(coeffs, _x);
-          double _epsi = _psi - atan2(polyeval(coeffs, _x), _x);
+          // double _cte = polyeval(coeffs, _x);
+          double _cte = coeffs[0] + v * sin(epsi) * latency.count();
+          // double _epsi = _psi - atan2(polyeval(coeffs, _x), _x);
+          double _epsi = _psi + epsi;
           double _v = v;
 
           state_vector << _x, _y, _psi, _v, _cte, _epsi;
