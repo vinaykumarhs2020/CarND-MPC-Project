@@ -14,6 +14,14 @@ I tried to experiment with combination of `N` and `dt` parameters to improve the
 | 10 | 0.15 | Smooth |
 | 25 | 0.25 | out of track sometimes|
 
+With few trial and errors, I ended up using __N = 10__ and __dt = 0.15__. This combination gave a good performance on speed and helped to keep the vehicle at the center of the road even at the sharp turns.
+
+
+### Latency and waypoints
+
+- I used the travel time of the message to calculate the latency in realtime. `std::chrono::duration<double> latency =  end_time - start_time;` calculates the time spent between previous message generation and current time step.
+- I use the trajectory information to fit a third order polynomial and use its coefficients to generate way points for x = [2,4,6 ... 20]. (The x domain is chosen to fit slightly longer line keeping the number of points to just 10)
+
 
 ### Additional observations
 
