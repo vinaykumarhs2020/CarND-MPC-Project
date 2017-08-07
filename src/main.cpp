@@ -73,10 +73,8 @@ void get_rotation_matrix(double psi, double px, double py, Eigen::MatrixXd &rota
   // Initialize rotation matrix with Identity matrix
   // rotation_matrx(0,0) = rotation_matrx(1,1) = 10;
   rotation_matrx(0,0) = rotation_matrx(1,1) = cos(psi);
-  rotation_matrx(0,1) = -1 * sin(psi);
+  rotation_matrx(0,1) = -sin(psi);
   rotation_matrx(1,0) = sin(psi);
-  // rotation_matrx(0,2) = -px;
-  // rotation_matrx(1,2) = -1.0 * py;
 }
 
 int main() {
@@ -90,8 +88,11 @@ int main() {
   double _ste = 0.0;
   auto start_time = std::chrono::system_clock::now();
 
-  Eigen::MatrixXd rotation_matrx = Eigen::MatrixXd::Zero(2,3);
+  Eigen::MatrixXd rotation_matrx(2,2);
+  VectorXd translation(2);
+  VectorXd state_vector(6);
   Eigen::MatrixXd global_traj;
+  vector<double> results;
 
   h.onMessage([&](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -117,35 +118,42 @@ int main() {
           double _t_steer = j[1]["steering_angle"];
           double _t_throt = j[1]["throttle"];
 
-          get_rotation_matrix(psi, px, py, rotation_matrx);
-          cout << rotation_matrx << endl;
-
-          // Create a matrix of homogeneous coordinates
+          // Translate and rotate vector to local coordinates
+          translation << px, py;
+          rotation_matrx << cos(psi), -sin(psi),
+                            sin(psi),  cos(psi);
           assert(ptsx.size() == ptsy.size());
-          global_traj.resize(3,ptsx.size());
+          global_traj.resize(2,ptsx.size());
           global_traj.row(0) = Eigen::Map<Eigen::VectorXd>(ptsx.data(), ptsx.size());
           global_traj.row(1) = Eigen::Map<Eigen::VectorXd>(ptsy.data(), ptsy.size());
-          global_traj.row(2).setConstant(1.0);
+          MatrixXd local_traj = rotation_matrx * (global_traj.colwise() - translation);
 
-          cout << global_traj << endl;
+          // Fit 3rd order polynomial to trajectory
+          VectorXd coeffs = polyfit(local_traj.row(0), local_traj.row(1), 3);
 
-          MatrixXd car_coord = rotation_matrx * global_traj;
-
-          cout << car_coord << endl;
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-
           auto end_time = std::chrono::system_clock::now();
           std::chrono::duration<double> latency =  end_time - start_time;
+          // Fill the state vector:
+          double _x = v * cos(psi) * latency.count();
+          double _y = v * sin(psi) * latency.count();
+          double _psi = -v * _t_steer * latency.count() / mpc.Lf;
+          double _cte = polyeval(coeffs, _x);
+          double _epsi = _psi - atan2(polyeval(coeffs, _x), _x);
+          double _v = v;
 
-          std::cout << "latency: " << latency.count() << std::endl;
+          state_vector << _x, _y, _psi, _v, _cte, _epsi;
+          // cout << state_vector << endl;
 
-          double steer_value = 0.1;
-          double throttle_value = 0.1;
+          results = mpc.Solve(state_vector, coeffs);
+
+          double steer_value =  - 1.0 * results[0];
+          double throttle_value = results[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -164,9 +172,13 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals(car_coord.row(0).data(), car_coord.row(0).data() + car_coord.row(0).size());
-          vector<double> next_y_vals(car_coord.row(1).data(), car_coord.row(1).data() + car_coord.row(1).size());
+          vector<double> next_x_vals;
+          vector<double> next_y_vals;
 
+          for(int i=0; i<10; ++i){
+              next_x_vals.push_back(i);
+              next_y_vals.push_back(polyeval(coeffs, i));
+          }
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
 

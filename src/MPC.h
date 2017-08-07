@@ -4,6 +4,27 @@
 #include <vector>
 #include "Eigen-3.3/Eigen/Core"
 
+// Define compile time constants:
+#define MPC_N 10
+#define MPC_DT 0.1
+#define X_START 0
+#define Y_START (X_START+MPC_N)
+#define PSI_START (Y_START+MPC_N)
+#define V_START (PSI_START+MPC_N)
+#define CTE_START (V_START+MPC_N)
+#define EPSI_START (CTE_START+MPC_N)
+#define DELTA_START (EPSI_START+MPC_N)
+#define A_START (DELTA_START+MPC_N-1)
+
+#define DELTA_THRESHOLD 0.436332
+#define A_THRESHOLD 1.0
+
+#define CTE_COST_FACTOR 1000
+#define EPSI_COST_FACTOR 1000
+#define DELTA_COST_FACTOR 50
+#define A_COST_FACTOR 50
+#define MPC_LF 2.67
+
 using namespace std;
 
 class MPC {
@@ -11,7 +32,7 @@ class MPC {
   MPC();
 
   virtual ~MPC();
-
+  const double Lf = MPC_LF;
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuatotions.
   vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
