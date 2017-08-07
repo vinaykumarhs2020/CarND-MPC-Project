@@ -139,6 +139,7 @@ int main() {
           */
           auto end_time = std::chrono::system_clock::now();
           std::chrono::duration<double> latency =  end_time - start_time;
+          std::cout << "Delay: " << latency.count() << std::endl;
           // Fill the state vector:
           double _x = v * cos(psi) * latency.count();
           double _y = v * sin(psi) * latency.count();
@@ -152,7 +153,7 @@ int main() {
 
           results = mpc.Solve(state_vector, coeffs);
 
-          double steer_value =  - 1.0 * results[0];
+          double steer_value =  - 1.0 * results[0]/DELTA_THRESHOLD;
           double throttle_value = results[1];
 
           json msgJson;

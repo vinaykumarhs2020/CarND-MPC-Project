@@ -53,13 +53,18 @@ class FG_eval {
     for(int i=0; i < MPC_N; i++){
       fg[0] += CTE_COST_FACTOR * CppAD::pow(vars[CTE_START + i], 2);
       fg[0] += EPSI_COST_FACTOR * CppAD::pow(vars[EPSI_START + i], 2);
-      // TODO: try to include velocity factor
+      fg[0] += CppAD::pow(vars[V_START + i] - MPC_REF_V, 2);
     }
 
     for(int j=0;j<MPC_N-1; ++j){
       // Add actuators cost to fg[0]
       fg[0] += DELTA_COST_FACTOR * CppAD::pow(vars[DELTA_START + j], 2);
       fg[0] += A_COST_FACTOR * CppAD::pow(vars[A_START + j], 2);
+    }
+
+    for (int t = 0; t < MPC_N - 2; t++) {
+      fg[0] += 1000*CppAD::pow(vars[DELTA_START + t + 1] - vars[DELTA_START + t], 2);
+      fg[0] += CppAD::pow(vars[A_START + t + 1] - vars[A_START + t], 2);
     }
 
     // Set values for fg[1:]
@@ -84,7 +89,7 @@ class FG_eval {
       AD<double> a0 = vars[A_START + t - 1];
 
       AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3);
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      AD<double> psides0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * CppAD::pow(x0, 2));
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -177,6 +182,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   }
 
   // TODO: Handle initial states seperately
+  constraints_upperbound[X_START] = constraints_lowerbound[X_START] = x;
+  constraints_upperbound[Y_START] = constraints_lowerbound[Y_START] = y;
+  constraints_upperbound[PSI_START] = constraints_lowerbound[PSI_START] = psi;
+  constraints_upperbound[V_START] = constraints_lowerbound[V_START] = v;
+  constraints_upperbound[CTE_START] = constraints_lowerbound[CTE_START] = cte;
+  constraints_upperbound[EPSI_START] = constraints_lowerbound[EPSI_START] = epsi;
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);

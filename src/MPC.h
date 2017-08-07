@@ -6,7 +6,7 @@
 
 // Define compile time constants:
 #define MPC_N 10
-#define MPC_DT 0.1
+#define MPC_DT 0.2
 #define X_START 0
 #define Y_START (X_START+MPC_N)
 #define PSI_START (Y_START+MPC_N)
@@ -24,6 +24,7 @@
 #define DELTA_COST_FACTOR 50
 #define A_COST_FACTOR 50
 #define MPC_LF 2.67
+#define MPC_REF_V 50
 
 using namespace std;
 
