@@ -181,9 +181,9 @@ int main() {
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
-          for(int i=0; i<10; ++i){
-              next_x_vals.push_back(i);
-              next_y_vals.push_back(polyeval(coeffs, i));
+          for(int i=1; i<10; ++i){
+              next_x_vals.push_back(i*2);
+              next_y_vals.push_back(polyeval(coeffs, i*2));
           }
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
